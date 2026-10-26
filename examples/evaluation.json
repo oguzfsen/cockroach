@@ -1,0 +1,404 @@
+{
+  "model": "examples/forager.npz",
+  "seed": 10000,
+  "episodes": 20,
+  "epsilon": 0.0,
+  "training": {
+    "decisions": 120000,
+    "episodes": 266,
+    "seed": 42,
+    "elapsed_seconds": 102.8301374950097,
+    "best_validation": {
+      "decisions": 120000,
+      "seed": 1000042,
+      "episodes": 5,
+      "mean_eaten": 9.8,
+      "mean_score": 200.82604945549173
+    }
+  },
+  "results": {
+    "random": {
+      "food_coverage": 0.2,
+      "mean_eaten": 2.4,
+      "mean_score": -33.57180628677745,
+      "pairings": 0,
+      "episodes": [
+        {
+          "days": 6,
+          "food_spawned": 12,
+          "eaten": 2,
+          "missed": 10,
+          "pairings": 0,
+          "eggs": 0,
+          "score": -44.490239055108134
+        },
+        {
+          "days": 6,
+          "food_spawned": 12,
+          "eaten": 4,
+          "missed": 8,
+          "pairings": 0,
+          "eggs": 0,
+          "score": 17.565034179688055
+        },
+        {
+          "days": 6,
+          "food_spawned": 12,
+          "eaten": 1,
+          "missed": 11,
+          "pairings": 0,
+          "eggs": 0,
+          "score": -66.6894714693808
+        },
+        {
+          "days": 6,
+          "food_spawned": 12,
+          "eaten": 1,
+          "missed": 11,
+          "pairings": 0,
+          "eggs": 0,
+          "score": -75.30198423614671
+        },
+        {
+          "days": 6,
+          "food_spawned": 12,
+          "eaten": 4,
+          "missed": 8,
+          "pairings": 0,
+          "eggs": 0,
+          "score": 14.618220212241472
+        },
+        {
+          "days": 6,
+          "food_spawned": 12,
+          "eaten": 0,
+          "missed": 12,
+          "pairings": 0,
+          "eggs": 0,
+          "score": -104.6797200279652
+        },
+        {
+          "days": 6,
+          "food_spawned": 12,
+          "eaten": 3,
+          "missed": 9,
+          "pairings": 0,
+          "eggs": 0,
+          "score": -15.349876561464027
+        },
+        {
+          "days": 6,
+          "food_spawned": 12,
+          "eaten": 4,
+          "missed": 8,
+          "pairings": 0,
+          "eggs": 0,
+          "score": 12.030689107440434
+        },
+        {
+          "days": 6,
+          "food_spawned": 12,
+          "eaten": 1,
+          "missed": 11,
+          "pairings": 0,
+          "eggs": 0,
+          "score": -73.74236221521731
+        },
+        {
+          "days": 6,
+          "food_spawned": 12,
+          "eaten": 4,
+          "missed": 8,
+          "pairings": 0,
+          "eggs": 0,
+          "score": 10.534077181612766
+        },
+        {
+          "days": 6,
+          "food_spawned": 12,
+          "eaten": 3,
+          "missed": 9,
+          "pairings": 0,
+          "eggs": 0,
+          "score": -18.056917158022262
+        },
+        {
+          "days": 6,
+          "food_spawned": 12,
+          "eaten": 2,
+          "missed": 10,
+          "pairings": 0,
+          "eggs": 0,
+          "score": -44.01868802528793
+        },
+        {
+          "days": 6,
+          "food_spawned": 12,
+          "eaten": 2,
+          "missed": 10,
+          "pairings": 0,
+          "eggs": 0,
+          "score": -47.414893121662246
+        },
+        {
+          "days": 6,
+          "food_spawned": 12,
+          "eaten": 4,
+          "missed": 8,
+          "pairings": 0,
+          "eggs": 0,
+          "score": 12.203357145581176
+        },
+        {
+          "days": 6,
+          "food_spawned": 12,
+          "eaten": 1,
+          "missed": 11,
+          "pairings": 0,
+          "eggs": 0,
+          "score": -78.77609883100429
+        },
+        {
+          "days": 6,
+          "food_spawned": 12,
+          "eaten": 1,
+          "missed": 11,
+          "pairings": 0,
+          "eggs": 0,
+          "score": -74.26398971822397
+        },
+        {
+          "days": 6,
+          "food_spawned": 12,
+          "eaten": 1,
+          "missed": 11,
+          "pairings": 0,
+          "eggs": 0,
+          "score": -75.73416293477382
+        },
+        {
+          "days": 6,
+          "food_spawned": 12,
+          "eaten": 5,
+          "missed": 7,
+          "pairings": 0,
+          "eggs": 0,
+          "score": 44.00596054034952
+        },
+        {
+          "days": 6,
+          "food_spawned": 12,
+          "eaten": 2,
+          "missed": 10,
+          "pairings": 0,
+          "eggs": 0,
+          "score": -46.38764145424163
+        },
+        {
+          "days": 6,
+          "food_spawned": 12,
+          "eaten": 3,
+          "missed": 9,
+          "pairings": 0,
+          "eggs": 0,
+          "score": -17.487419293964024
+        }
+      ]
+    },
+    "learned": {
+      "food_coverage": 0.8041666666666667,
+      "mean_eaten": 9.65,
+      "mean_score": 198.59019688484943,
+      "pairings": 1,
+      "episodes": [
+        {
+          "days": 6,
+          "food_spawned": 12,
+          "eaten": 11,
+          "missed": 1,
+          "pairings": 0,
+          "eggs": 0,
+          "score": 230.5992970854095
+        },
+        {
+          "days": 6,
+          "food_spawned": 12,
+          "eaten": 10,
+          "missed": 2,
+          "pairings": 0,
+          "eggs": 0,
+          "score": 208.67789066043179
+        },
+        {
+          "days": 6,
+          "food_spawned": 12,
+          "eaten": 9,
+          "missed": 3,
+          "pairings": 0,
+          "eggs": 0,
+          "score": 186.25924634034286
+        },
+        {
+          "days": 6,
+          "food_spawned": 12,
+          "eaten": 8,
+          "missed": 4,
+          "pairings": 0,
+          "eggs": 0,
+          "score": 155.10964514930177
+        },
+        {
+          "days": 6,
+          "food_spawned": 12,
+          "eaten": 12,
+          "missed": 0,
+          "pairings": 0,
+          "eggs": 0,
+          "score": 260.13907436524033
+        },
+        {
+          "days": 6,
+          "food_spawned": 12,
+          "eaten": 10,
+          "missed": 2,
+          "pairings": 0,
+          "eggs": 0,
+          "score": 203.74947033643048
+        },
+        {
+          "days": 6,
+          "food_spawned": 12,
+          "eaten": 8,
+          "missed": 4,
+          "pairings": 0,
+          "eggs": 0,
+          "score": 145.93704408358687
+        },
+        {
+          "days": 6,
+          "food_spawned": 12,
+          "eaten": 12,
+          "missed": 0,
+          "pairings": 0,
+          "eggs": 0,
+          "score": 269.35614044952035
+        },
+        {
+          "days": 6,
+          "food_spawned": 12,
+          "eaten": 10,
+          "missed": 2,
+          "pairings": 0,
+          "eggs": 0,
+          "score": 207.13469549400747
+        },
+        {
+          "days": 6,
+          "food_spawned": 12,
+          "eaten": 11,
+          "missed": 1,
+          "pairings": 0,
+          "eggs": 0,
+          "score": 237.2352691285757
+        },
+        {
+          "days": 6,
+          "food_spawned": 12,
+          "eaten": 9,
+          "missed": 3,
+          "pairings": 0,
+          "eggs": 0,
+          "score": 177.67411903808676
+        },
+        {
+          "days": 6,
+          "food_spawned": 12,
+          "eaten": 6,
+          "missed": 6,
+          "pairings": 0,
+          "eggs": 0,
+          "score": 88.2876205519407
+        },
+        {
+          "days": 6,
+          "food_spawned": 12,
+          "eaten": 10,
+          "missed": 2,
+          "pairings": 1,
+          "eggs": 8,
+          "score": 243.5186600716929
+        },
+        {
+          "days": 6,
+          "food_spawned": 12,
+          "eaten": 10,
+          "missed": 2,
+          "pairings": 0,
+          "eggs": 0,
+          "score": 207.218559684097
+        },
+        {
+          "days": 6,
+          "food_spawned": 12,
+          "eaten": 9,
+          "missed": 3,
+          "pairings": 0,
+          "eggs": 0,
+          "score": 178.90766198944885
+        },
+        {
+          "days": 6,
+          "food_spawned": 12,
+          "eaten": 9,
+          "missed": 3,
+          "pairings": 0,
+          "eggs": 0,
+          "score": 179.21124895641302
+        },
+        {
+          "days": 6,
+          "food_spawned": 12,
+          "eaten": 9,
+          "missed": 3,
+          "pairings": 0,
+          "eggs": 0,
+          "score": 178.52997653620528
+        },
+        {
+          "days": 6,
+          "food_spawned": 12,
+          "eaten": 10,
+          "missed": 2,
+          "pairings": 0,
+          "eggs": 0,
+          "score": 207.77237421557226
+        },
+        {
+          "days": 6,
+          "food_spawned": 12,
+          "eaten": 10,
+          "missed": 2,
+          "pairings": 0,
+          "eggs": 0,
+          "score": 204.4960987972086
+        },
+        {
+          "days": 6,
+          "food_spawned": 12,
+          "eaten": 10,
+          "missed": 2,
+          "pairings": 0,
+          "eggs": 0,
+          "score": 201.98984476347647
+        }
+      ]
+    }
+  },
+  "paired_food_difference": {
+    "mean": 7.25,
+    "bootstrap_95_ci": [
+      6.6,
+      7.85
+    ]
+  }
+}

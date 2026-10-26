@@ -1,0 +1,6 @@
+{"decisions": 20000, "seed": 1000042, "episodes": 5, "mean_eaten": 7.0, "mean_score": 116.23021734723875, "selected": true}
+{"decisions": 40000, "seed": 1000042, "episodes": 5, "mean_eaten": 1.4, "mean_score": -41.14890800770266, "selected": false}
+{"decisions": 60000, "seed": 1000042, "episodes": 5, "mean_eaten": 0.8, "mean_score": -64.31048069337908, "selected": false}
+{"decisions": 80000, "seed": 1000042, "episodes": 5, "mean_eaten": 2.0, "mean_score": -25.88917339823314, "selected": false}
+{"decisions": 100000, "seed": 1000042, "episodes": 5, "mean_eaten": 7.4, "mean_score": 124.88033116480828, "selected": true}
+{"decisions": 120000, "seed": 1000042, "episodes": 5, "mean_eaten": 9.8, "mean_score": 200.82604945549173, "selected": true}

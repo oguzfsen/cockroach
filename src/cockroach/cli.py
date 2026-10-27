@@ -44,12 +44,21 @@ def parser() -> argparse.ArgumentParser:
     train.add_argument("--seed", type=int, default=42)
     train.add_argument("--day-seconds", type=positive_float, default=None)
     train.add_argument("--episode-days", type=positive_int, default=None)
-    view = commands.add_parser("view", help="Öğrenme yapmadan izle veya elle yönet")
+    view = commands.add_parser("view", help="İzle, elle yönet veya isteğe bağlı canlı öğren")
     view.add_argument("--model", type=Path, help="Varsa runs/latest.best.npz otomatik açılır")
     view.add_argument(
         "--random", action="store_true", help="Öğrenilmiş model yerine rastgele davranış"
     )
     view.add_argument("--seed", type=int, default=7)
+    view.add_argument("--learn", action="store_true", help="Canlı öğrenmeyi açık başlat")
+    view.add_argument(
+        "--output",
+        type=Path,
+        default=Path("runs/live.npz"),
+        help="Canlı öğrenmenin ayrı kayıt dosyası",
+    )
+    view.add_argument("--natural", action="store_true", help="Habitat işaretlerini gizle")
+    view.add_argument("--episode-days", type=positive_int, help="Gözlem bölümünün gün sayısı")
     view.add_argument("--headless", action="store_true", help="Ekransız görsel kontrol (SDL dummy)")
     view.add_argument("--frames", type=positive_int, help="Bu kadar çizimden sonra çık")
     view.add_argument("--screenshot", type=Path, help="Çıkışta PNG kaydet")
@@ -80,7 +89,7 @@ def main(argv=None) -> int:
             if args.resume and (args.day_seconds is not None or args.episode_days is not None):
                 root.error("--resume ortam parametrelerini modelden okur; gün ayarlarını kaldırın.")
             config = WorldConfig(
-                day_seconds=args.day_seconds or 60, episode_days=args.episode_days or 6
+                day_seconds=args.day_seconds or 60, episode_days=args.episode_days or 30
             )
             train(
                 minutes=args.minutes if args.minutes is not None else (None if args.steps else 5),
@@ -122,6 +131,10 @@ def main(argv=None) -> int:
                 frames=args.frames,
                 screenshot=args.screenshot,
                 headless=args.headless,
+                learning=args.learn,
+                output=args.output,
+                natural=args.natural,
+                episode_days=args.episode_days,
             )
     except (ValueError, OSError) as error:
         print(f"Hata: {error}")

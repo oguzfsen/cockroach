@@ -8,7 +8,7 @@ class WorldConfig:
     fps: int = 30
     decision_frames: int = 24
     day_seconds: float = 60.0
-    episode_days: int = 6
+    episode_days: int = 30
     radius: float = 18.0
     speed: float = 90.0
     turn_speed: float = 2.5
@@ -17,6 +17,9 @@ class WorldConfig:
     passive_range: float = 140.0
     mating_seconds: float = 2.4
     mating_cooldown: float = 15.0
+    fertility_energy_factor: float = 1.2
+    mating_reward: float = 22.0
+    food_speed_ratio: float = 0.5
 
     def __post_init__(self):
         numeric = (
@@ -31,6 +34,9 @@ class WorldConfig:
             self.passive_range,
             self.mating_seconds,
             self.mating_cooldown,
+            self.fertility_energy_factor,
+            self.mating_reward,
+            self.food_speed_ratio,
         )
         import math
 
@@ -60,3 +66,7 @@ class WorldConfig:
     @property
     def episode_frames(self) -> int:
         return self.day_frames * self.episode_days
+
+    @property
+    def meal_seconds(self) -> float:
+        return self.day_frames / self.fps / self.fertility_energy_factor

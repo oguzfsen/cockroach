@@ -6,6 +6,7 @@ burada değildir; kullanıcı kodu rsync ile hedefe gönderip orada derler ve ç
 
 - Fizik ve duyular `world.py` içinde, çizimden bağımsız tutulmalıdır.
 - Eğitim pygame, pencere ya da ekran sunucusu gerektirmemelidir.
-- Görüntüleyici ağ ağırlıklarını değiştirmez; fizik eğitimle aynıdır.
+- Görüntüleyici varsayılan olarak öğrenmez; canlı öğrenme yalnızca kullanıcı açarsa çalışır.
+  Elle kontrol ve F2 deney sahnesi öğrenmeye dahil edilmez; fizik eğitimle aynıdır.
 - Gözlemlere gizli yiyecek koordinatları eklemeyin.
 - Kontroller: `python -m pytest`, `ruff check .`, `ruff format --check .`.

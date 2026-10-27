@@ -4,7 +4,8 @@
 
 Tepeden görülen 2D bir böcek yaşam alanı ve küçük bir pekiştirmeli öğrenme laboratuvarı.
 Penceresiz eğitim gerçek zamandan çok daha hızlı çalışır. Gözlemevi aynı fiziği kullanır,
-ağları değiştirmeden davranışları gösterir ve elle kontrol sunar.
+varsayılan olarak öğrenmeden davranışları gösterir ve elle kontrol sunar. İsteğe bağlı
+canlı öğrenme tek düğmeyle açılabilir.
 
 ![Cockroach Lab gözlemevi](docs/preview.png)
 
@@ -23,9 +24,11 @@ Görüntüleyici sırasıyla `runs/latest.best.npz`, `runs/latest.npz` ve depoya
 
 ```bash
 ./train.sh 5                         # 5 gerçek dakika, pencere açmadan öğren
-./view.sh                            # öğrendiğini izle; bu pencerede öğrenme yok
+./view.sh                            # izle; varsayılan olarak öğrenme kapalı
 ./view.sh --random                   # eğitimsiz başlangıçla karşılaştır
 ./view.sh --model examples/forager.npz
+./view.sh --natural                  # işaretler olmadan doğal habitat
+./view.sh --learn                    # canlı öğrenmeyi açık başlat
 ```
 
 Betik kullanmadan, Windows dahil:
@@ -55,6 +58,8 @@ ekran sunucusu aranmaz. Python modülüyle de çalışır: `python -m cockroach 
 | `H` | Koku alanını göster/gizle |
 | `C` | Çarpışma çemberlerini ve abdomen temas noktalarını göster/gizle |
 | `T` | Hareket izlerini göster/gizle |
+| `F1` / İşaretler düğmesi | Habitatın tüm yardımcı çizimlerini birlikte göster/gizle |
+| `O` / Öğrenme düğmesi | Canlı öğrenmeyi aç/kapat; varsayılan kapalı |
 | `+` / `-` | Gözlem hızı: 0,5×, 1×, 2×, 4×, 8× |
 | `F2` | Beslenmiş çiftle etiketli üreme deneyi başlat |
 | `N` | Yeni rastgele ortam |
@@ -70,17 +75,60 @@ kalmaya devam eder. Pencere yeniden boyutlandırılabilir.
 kur eylemini seçer. Bu bir **deney sahnesidir**, öğrenilmiş bir başarı olarak sayılmaz;
 eğitime veya değerlendirmeye dahil edilmez. Sonrasında `N` ile normal ortama dönülür.
 
+`F1` kapalıyken habitatta yalnızca böcekler, hareketli kurtçuklar ve yumurtalar görünür;
+adlar, seçim yayları, koklama çizgileri, besin etiketleri, koku alanı, izler, çarpışma
+çemberleri ve koordinat ızgarası gizlenir. Yan bilgi panelleri ve kontrol düğmeleri
+kullanılabilir kalır. Ayrı koku/iz/çember tercihleri korunur; `F1` tekrar açıldığında geri gelir.
+
+![Doğal habitat görünümü](docs/natural.png)
+
+## Canlı öğrenme
+
+Bu küçük NumPy ağlarında gerçek zamanlı öğrenmenin hesap yükü düşüktür: her 0,8 saniyede
+iki deney kaydedilir ve yeterli replay birikince her dört kararda bir küçük ağ güncellenir.
+Penceresiz eğitimle aynı öğrenme yöntemidir; gözlem hızında ilerlediği için daha yavaştır.
+`O` ile açılana veya `--learn` verilene kadar öğrenme yapılmaz.
+
+```bash
+./view.sh --learn --model runs/latest.npz
+./view.sh --learn --model runs/live.npz       # canlı öğrenmenin kaydından devam
+./view.sh --learn --output runs/my-live.npz
+```
+
+Canlı mod mevcut ağırlıkları, optimizer durumunu ve keşif sayacını korur. Replay ilk
+açılışta boştur; 256 geçiş birikince ağırlık güncellemeleri başlar. Aynı pencere içinde
+öğrenmeyi kapatıp açmak replay'i silmez. Elle kontrol sırasında ve `F2` ile başlatılan
+deney dünyasının tamamında öğrenme askıya alınır; normal ortama `N` ile dönülür.
+Duraklatıldığında da öğrenme ilerlemez.
+
+Canlı öğrenme 15 saniyede bir, kapatıldığında ve pencere kapanırken **`runs/live.npz`**
+dosyasına kaydedilir; açılan kaynak model varsayılan olarak değiştirilmez. `--output`
+ile farklı kayıt yeri seçilebilir. Canlı kayıttan terminal eğitimine de devam edilebilir:
+
+```bash
+./train.sh 10 --resume runs/live.npz --output runs/continued.npz
+```
+
+Terminal eğitimi ve pencere aynı anda açılabilir. Varsayılan terminal kaydı `runs/latest.npz`,
+canlı kayıt `runs/live.npz` olduğundan birbirlerinin ağırlıklarını ezmezler. `L`, açık
+kaynak modelin son kaydını yükler; varsa canlı ilerleme önce ayrı dosyasına kaydedilir.
+
 ## Ortam kuralları
 
 - Ada biraz daha geniş, kısa kanat örtülü; Atlas daha dar ve uzun kanat örtülü çizilir.
   Her birinde altı eklemli bacak, dönüş/yürüyüş animasyonu ve tarayan iki anten bulunur.
 - Fizik ve çizim varsayılan olarak 30 Hz çalışır. Gövde başına tek **18 birim yarıçaplı
   çember**, duvar ve böcek çarpışmaları için yeterlidir. Bacak/anten çarpışması yoktur.
-- Bir simülasyon günü **60 saniye**, bir eğitim bölümü **6 gün**dür. Bunlar biyolojik
+- Bir simülasyon günü **60 saniye**, bir bölüm **30 gün**dür. Bunlar biyolojik
   zaman ölçeğinin sıkıştırılmasıdır; eğitim dakikası gerçek duvar saati zamanıdır.
 - Her gün başında rastgele iki besin belirir. Önceki günün yenmemiş besinleri kaldırılır.
-  Her böcek günde en fazla birini yiyebilir; böylece bir böcek iki günlük payı da tüketmez.
-- Yenen bir besin, yenildiği andan itibaren **bir tam gün** üreme hakkı verir.
+  Besinler durmadan hareket eden kurtçuklardır: hızları böceğin ileri yürüme hızının
+  **yarısıdır** ve duvarlardan sekerek yön değiştirirler.
+- Besin paylaşımı **rekabetçidir**: beslenmiş bir böcek diğer besini de yiyebilir.
+  Aynı karede ikisi de temas ederse daha yakın olan böcek kazanır; tam eşitlikte
+  öncelik kareye göre dönüşür. Yenilen her kurtçuk +20 puan verir.
+- Üreme enerjisi tüketimi %20 artmıştır: bir öğün enerjiyi **60 / 1,2 = 50 saniyeye**
+  tamamlar. Yeni öğün bu süreyi yeniler; günlük yeme kilidi veya biriken sınırsız rezerv yoktur.
   Öğünü kaçıran böcek puan kaybeder ama ölmez; öğrenme deneyi devam eder.
 - Koku mesafeyle yumuşak biçimde azalır. Pasif anten algısı 140, koklama eylemi 420
   birime uzanır. Ölçümler karar sonunda güncellenir; koklamak yerinde durmayı gerektirir.
@@ -107,14 +155,15 @@ akvaryumdaki mutlak konum ağa verilmez.** Kokunun ekranda görünmesi algıyı 
 | --- | --- |
 | Besin bulma | +20 |
 | Gün sonunda kaçırılan öğün | −8 |
-| Tamamlanan çiftleşme | Her böceğe +18 |
-| Açken yerel koku potansiyelindeki değişim | `3 × (yeni − eski)` |
+| Tamamlanan çiftleşme | Her böceğe +22 (önceki sürümde +18) |
+| Yürümeyle yerel koku potansiyelindeki değişim | `3 × (yeni − eski)` |
 | Karar süresinin geçmesi | −0,001 |
 | Bir karar boyunca çarpışma | En fazla −0,06 |
 
 Koku değişimi, seyrek besin ödülünü öğrenmeyi kolaylaştıran küçük bir şekillendirme
 ödülüdür. Asıl performans ölçüsü puandan ayrı olarak **yenilen besin oranıdır**.
 Skorlar tüm ödül ve cezaların toplamını gösterir.
+Hareket eden kurtçuğun duran böceğe yaklaşması tek başına şekillendirme ödülü vermez.
 
 ```bash
 cockroach train --minutes 10 --output runs/experiment.npz
@@ -128,6 +177,13 @@ tohumla sıfırdan başlayan eğitim tekrar üretilebilir. `--resume` ağırlık
 Adam durumunu, keşif sayacını ve RNG'yi geri getirir; **yeni bölüm ve boş replay ile**
 devam eder. Yarım kalan dünyanın birebir devam kaydı değildir. Ortam ayarları modelden
 okunur; devam ederken değiştirilemez.
+
+**Eski modeller korunur:** 0.1 sürümünün kayıtları açılabilir. Öğrenilmiş ağlar ve
+optimizer aynı kalır; eski varsayılan 6 günlük bölüm 30 güne yükseltilir, yeni enerji,
+üreme ödülü ve hareketli/rekabetçi besin kuralları uygulanır. Açma işlemi eski dosyayı
+değiştirmez. Değişen ortam nedeniyle önceki doğrulama skoru yeni adaylarla karşılaştırılmaz.
+Yeni kayıt biçimi 2'dir. Gözlem ve eylem boyutları değişmemiştir.
+Gözlem süresi ayrıca `./view.sh --episode-days 30` ile seçilebilir.
 
 Son model 15 saniyede bir ve çıkışta atomik olarak kaydedilir. `Ctrl+C` ilerlemeyi
 kaydedip çıkar. Her 20.000 kararda ve normal bitişte beş ayrı doğrulama bölümünde
@@ -155,7 +211,9 @@ Rapor `runs/evaluation.json` dosyasına yazılır; bölüm bazında eşleştiril
 ile besin farkının %95 aralığı da verilir. Bu aralık tek bir eğitilmiş modelin dünya
 tohumları üzerindeki farkıdır; farklı eğitim tohumlarının değişkenliğini ölçmez.
 
-Depoyla gelen örnek modelin koşulları ve gerçek ölçümü: [examples/README.md](examples/README.md).
+Depoyla gelen örnek modelin **0.1 ortamındaki arşiv ölçümü**:
+[examples/README.md](examples/README.md). Bu sonuçlar yeni hareketli besin kurallarının
+performans ölçümü değildir; yeni ortam için yeniden değerlendirme gerekir.
 Kısa besin eğitimi, çiftleşme davranışının öğrenildiğini garanti etmez. `F2` ile doğrulanan
 üreme mekaniği ile politikanın kendi başına üremeyi öğrenmesi ayrı şeylerdir.
 
@@ -178,7 +236,7 @@ src/cockroach/
   brain.py        NumPy Double DQN, replay, Adam
   checkpoint.py   Atomik model kaydı/yüklemesi
   training.py     Süreli eğitim, doğrulama, karşılaştırma
-  viewer.py       Pygame gözlemevi ve elle kontrol
+  viewer.py       Pygame gözlemevi, elle kontrol ve canlı öğrenme
   cli.py          train / view / evaluate
 ```
 

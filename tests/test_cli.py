@@ -47,3 +47,16 @@ def test_training_does_not_require_pygame_or_display():
         timeout=10,
     )
     assert process.returncode == 0, process.stderr
+
+
+def test_view_flags_start_readonly_unless_learning_is_requested(monkeypatch):
+    from cockroach import viewer
+
+    calls = []
+    monkeypatch.setattr(viewer, "run", lambda **kwargs: calls.append(kwargs))
+    assert main(["view", "--model", "unused.npz", "--natural"]) == 0
+    assert calls[-1]["learning"] is False
+    assert calls[-1]["natural"] is True
+    assert main(["view", "--random", "--learn", "--episode-days", "30"]) == 0
+    assert calls[-1]["learning"] is True
+    assert calls[-1]["episode_days"] == 30

@@ -4,7 +4,7 @@ import numpy as np
 import pytest
 
 from cockroach.config import WorldConfig
-from cockroach.world import OBS_NAMES, OBS_SIZE, Action, Food, World
+from cockroach.world import FOOD_RADIUS, OBS_NAMES, OBS_SIZE, Action, Food, World, reflect_axis
 
 
 def test_seed_reproduces_world_and_trajectory():
@@ -148,19 +148,106 @@ def test_two_daily_foods_expire_and_missing_meals_are_penalized_once():
     assert world.summary() == summary
 
 
-def test_one_meal_grants_one_day_fertility_and_cannot_take_both_daily_rations():
+def test_competitive_bug_can_take_both_daily_foods_and_receives_both_rewards():
     world = World()
     a, b = world.insects
     a.x, a.y = 200, 200
     b.x, b.y = 800, 500
     world.food = [Food(200, 200, 0), Food(202, 202, 0)]
     world.step([Action.REST, Action.REST])
-    assert a.eaten == 1
-    assert len(world.food) == 1
-    assert a.fertile_until == 60
+    assert a.eaten == 2
+    assert not world.food
+    assert a.fertile_until == 50
     assert a.fertile(world.now)
-    assert a.score > 19
-    assert not a.fertile(60)
+    assert a.score > 39
+    assert not a.fertile(50)
+
+
+def test_each_meal_refills_energy_without_daily_eating_lock():
+    world = World()
+    a, b = world.insects
+    a.x, a.y, b.x, b.y = 200, 200, 800, 500
+    world.food = [Food(a.x, a.y, 0)]
+    world.step([Action.REST, Action.REST])
+    first_expiry = a.fertile_until
+    world.food = [Food(a.x, a.y, 0)]
+    world.step([Action.REST, Action.REST])
+    assert a.eaten == 2
+    assert a.fertile_until == pytest.approx(first_expiry + world.config.decision_seconds)
+    assert a.fertile_until - 0.8 == world.config.day_seconds / 1.2
+
+
+def test_nearest_bug_wins_shared_food_even_if_it_is_the_male():
+    world = World()
+    a, b = world.insects
+    a.x, a.y, b.x, b.y = 200, 200, 236, 200
+    world.food = [Food(220, 200, 0)]
+    world.step([Action.REST, Action.REST])
+    assert a.eaten == 0
+    assert b.eaten == 1
+    assert len(world.food) == 0
+
+
+def test_spawned_worms_keep_half_insect_speed_and_stay_inside_walls():
+    world = World(seed=14)
+    for _ in range(1000):
+        world._move_food()
+        for food in world.food:
+            assert math.hypot(food.vx, food.vy) == pytest.approx(world.config.speed / 2)
+            assert FOOD_RADIUS <= food.x <= world.config.width - FOOD_RADIUS
+            assert FOOD_RADIUS <= food.y <= world.config.height - FOOD_RADIUS
+
+
+@pytest.mark.parametrize(
+    "position,velocity,dt,expected_position,expected_velocity",
+    [
+        (9, 4, 1, 7, -4),
+        (1, -4, 1, 3, 4),
+        (5, 35, 1, 0, 35),
+        (5, -35, 1, 10, -35),
+        (9, 1, 1, 10, -1),
+        (1, -1, 1, 0, 1),
+    ],
+)
+def test_food_bounces_preserve_speed_and_overshoot(
+    position, velocity, dt, expected_position, expected_velocity
+):
+    x, vx = reflect_axis(position, velocity, dt, 0, 10)
+    assert x == pytest.approx(expected_position)
+    assert vx == expected_velocity
+
+
+def test_worm_changes_both_directions_at_a_corner():
+    world = World()
+    world.food = [Food(953, 633, 0, 30, 30)]
+    world._move_food()
+    food = world.food[0]
+    assert (food.vx, food.vy) == (-30, -30)
+    assert (food.x, food.y) == (952, 632)
+
+
+def test_idle_bug_does_not_earn_odor_reward_from_moving_food():
+    world = World()
+    a, b = world.insects
+    a.x, a.y, b.x, b.y = 100, 100, 800, 500
+    world.food = [Food(300, 100, 0, -45, 0)]
+    _, rewards, _ = world.step([Action.REST, Action.REST])
+    assert world.food[0].x < 300
+    np.testing.assert_allclose(rewards, [-0.001, -0.001], atol=1e-7)
+
+
+def test_default_horizon_extends_past_day_six_and_ends_at_day_thirty():
+    world = World()
+    assert world.config.episode_days == 30
+    world.frame = world.config.day_frames * 6
+    world.day = 6
+    assert not world.done
+    world.frame = world.config.episode_frames - 1
+    world.day = 29
+    assert not world.done
+    world.tick()
+    assert world.done
+    assert world.day == 30
 
 
 def mating_world():
@@ -187,7 +274,7 @@ def test_mating_requires_abdomen_contact_then_completes_and_has_cooldown():
     assert world.eggs == 8
     assert all(b.mating_count == 1 for b in world.insects)
     assert all(b.cooldown_until > world.now for b in world.insects)
-    assert all(b.score > 17 for b in world.insects)
+    assert all(b.score > 21 for b in world.insects)
     for _ in range(75):
         world.tick()
     assert world.pairings == 1

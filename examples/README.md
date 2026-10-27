@@ -1,5 +1,11 @@
 # Örnek besin arama modeli
 
+**Arşiv: aşağıdaki eğitim ve ölçümler 0.1.0 ortamına aittir** (sabit besin, 6 gün,
+günde bir öğün). 0.2 sürümü bu modeli ağırlıklarını koruyarak yeni 30 günlük,
+hareketli ve rekabetçi besin ortamına aktarır. Eski dosya değiştirilmez. Bu rapor
+yeni kuralların başarısını ölçmez; aşağıdaki değerlendirme komutu güncel ortamda
+yeni bir rapor üretir. Yeni sürüm hazırlanırken yeniden eğitim yapılmamıştır.
+
 `forager.npz`, Ada ve Atlas için ayrı ağları içerir. Görüntüleyici yalnızca çıkarım yapar.
 Model gerçek pekiştirmeli öğrenmeyle üretildi; önceden yazılmış besin arama politikası
 veya uzman gösterimi kullanılmadı.

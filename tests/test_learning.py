@@ -113,6 +113,52 @@ def test_unknown_checkpoint_version_is_rejected(tmp_path):
         checkpoint.load(path)
 
 
+def test_legacy_checkpoint_upgrades_environment_without_losing_learned_state(tmp_path):
+    path = tmp_path / "legacy.npz"
+    brains = [Brain(1), Brain(2)]
+    brains[0].steps = 750_000
+    state = {"decisions": 750_000, "episodes": 900, "best_validation": {"mean_eaten": 9}}
+    checkpoint.save(path, brains, WorldConfig(episode_days=6), state)
+    with np.load(path, allow_pickle=False) as data:
+        arrays = dict(data)
+    meta = json.loads(str(arrays["metadata"]))
+    meta["version"] = 1
+    for field in ("fertility_energy_factor", "mating_reward", "food_speed_ratio"):
+        del meta["world"][field]
+    arrays["metadata"] = np.array(json.dumps(meta))
+    np.savez(path, **arrays)
+    original_file = path.read_bytes()
+    restored, config, metadata = checkpoint.load(path, training=True)
+    assert config.episode_days == 30
+    assert config.meal_seconds == 50
+    assert config.food_speed_ratio == 0.5
+    assert config.mating_reward == 22
+    assert metadata["migrated_from"] == 1
+    assert metadata["best_validation"] is None
+    assert restored[0].steps == 750_000
+    for original, loaded in zip(brains, restored, strict=True):
+        for key in original.network.params:
+            np.testing.assert_array_equal(original.network.params[key], loaded.network.params[key])
+            np.testing.assert_array_equal(original.target.params[key], loaded.target.params[key])
+        assert original.rng.bit_generator.state == loaded.rng.bit_generator.state
+    assert path.read_bytes() == original_file
+
+
+def test_enabling_live_replay_preserves_weights_and_existing_replay():
+    brain = Brain(2, training=False)
+    weights = brain.network.params["w0"].copy()
+    brain.steps = 1000
+    brain.enable_learning()
+    replay = brain.replay
+    state = np.zeros(OBS_SIZE, dtype=np.float32)
+    brain.remember(state, 0, 1, state, False)
+    brain.enable_learning()
+    assert brain.replay is replay
+    assert brain.replay.size == 1
+    assert brain.steps == 1001
+    np.testing.assert_array_equal(brain.network.params["w0"], weights)
+
+
 def test_short_training_and_resume_save_progress_and_csv(tmp_path):
     path = tmp_path / "model.npz"
     config = WorldConfig(day_seconds=1.6, episode_days=1)

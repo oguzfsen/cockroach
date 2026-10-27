@@ -12,6 +12,7 @@ import numpy as np
 from cockroach.config import WorldConfig
 
 TAU = math.tau
+FOOD_RADIUS = 7.0
 
 
 class Action(IntEnum):
@@ -66,6 +67,18 @@ class Food:
     x: float
     y: float
     day: int
+    vx: float = 0.0
+    vy: float = 0.0
+
+
+def reflect_axis(position: float, velocity: float, dt: float, low: float, high: float):
+    """Reflect motion without losing overshoot, including multiple wall crossings."""
+    span = high - low
+    phase = (position - low + velocity * dt) % (2 * span)
+    reflected = phase > span or (phase == span and velocity > 0) or (phase == 0 and velocity < 0)
+    return low + (
+        phase if phase <= span else 2 * span - phase
+    ), -velocity if reflected else velocity
 
 
 @dataclass
@@ -153,9 +166,23 @@ class World:
                     math.hypot(x - b.x, y - b.y) > c.radius * 2 for b in self.insects
                 ):
                     break
-            self.food.append(Food(x, y, self.day))
+            heading = self.rng.uniform(-math.pi, math.pi)
+            speed = c.speed * c.food_speed_ratio
+            self.food.append(
+                Food(x, y, self.day, math.cos(heading) * speed, math.sin(heading) * speed)
+            )
         self.food_spawned += 2
         self.log(f"Gün {self.day + 1}: iki yeni besin")
+
+    def _move_food(self):
+        c = self.config
+        for food in self.food:
+            food.x, food.vx = reflect_axis(
+                food.x, food.vx, c.dt, FOOD_RADIUS, c.width - FOOD_RADIUS
+            )
+            food.y, food.vy = reflect_axis(
+                food.y, food.vy, c.dt, FOOD_RADIUS, c.height - FOOD_RADIUS
+            )
 
     def scent_at(self, x: float, y: float, reach: float | None = None) -> float:
         """Finite-range, continuous odor. No food coordinates enter observations."""
@@ -275,7 +302,7 @@ class World:
                 for i, bug in enumerate(self.insects):
                     bug.mating_count += 1
                     bug.cooldown_until = now + self.config.mating_cooldown
-                    self._reward(i, 18.0)
+                    self._reward(i, self.config.mating_reward)
                 self.log("Abdomen teması tamamlandı · +8 yumurta")
             return
         if not (a.fertile(now) and b.fertile(now)):
@@ -299,28 +326,33 @@ class World:
         if self.done:
             return
         c = self.config
+        self._move_food()
+        # Measure both potentials against the same food positions. A moving worm
+        # cannot reward an idle insect merely by approaching it.
         before = [self.scent_at(b.x, b.y) for b in self.insects]
         for bug in self.insects:
             self._move(bug)
         self._collisions()
+        after = [self.scent_at(b.x, b.y) for b in self.insects]
         for i, bug in enumerate(self.insects):
             # Local odor-potential shaping, never a hidden target direction.
-            potential = self.scent_at(bug.x, bug.y)
-            if bug.ate_day != self.day:
-                self._reward(i, 3.0 * (potential - before[i]))
+            self._reward(i, 3.0 * (after[i] - before[i]))
             self._reward(i, -0.001 / c.decision_frames)
             if bug.collision:
                 self._reward(i, -0.06 / c.decision_frames)
-            if bug.ate_day != self.day:
-                for food in list(self.food):
-                    if math.hypot(bug.x - food.x, bug.y - food.y) < c.radius + 7:
-                        self.food.remove(food)
-                        bug.eaten += 1
-                        bug.ate_day = self.day
-                        bug.fertile_until = self.now + c.day_frames / c.fps
-                        self._reward(i, 20.0)
-                        self.log(f"{'Dişi' if i == 0 else 'Erkek'} beslendi · +20")
-                        break
+        # Food belongs to whoever reaches it first, including an already fed bug.
+        # Choose the nearest circle if both touch in one tick; alternate exact ties.
+        for food in list(self.food):
+            distances = [math.hypot(b.x - food.x, b.y - food.y) for b in self.insects]
+            i = min(range(2), key=lambda j: (distances[j], (j - self.frame) % 2))
+            if distances[i] < c.radius + FOOD_RADIUS:
+                bug = self.insects[i]
+                self.food.remove(food)
+                bug.eaten += 1
+                bug.ate_day = self.day
+                bug.fertile_until = self.now + c.meal_seconds
+                self._reward(i, 20.0)
+                self.log(f"{'Dişi' if i == 0 else 'Erkek'} beslendi · +20")
         self._mate()
         self.frame += 1
         if self.frame % c.day_frames == 0:

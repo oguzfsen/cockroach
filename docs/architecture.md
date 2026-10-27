@@ -46,10 +46,36 @@ Kullanıcı aynı tohumları özellikle seçerse ayrılık bozulabilir. Örnek m
 doğrulama ve test tohumları ayrı tutulur. Doğrulama aynı beş dünya üzerinde tekrarlandığı
 için en iyi modeli bu örneklere fazla uydurmak mümkündür; son test bunun için ayrıdır.
 
-Gözlemevi modelleri `training=False` ile açar: replay belleği oluşturulmaz ve
-`remember` çağrısı hata verir. Kayıtlar yerinde değiştirilmez. `L` ile yüklenen
-model yeni bir gözlem bölümü başlatır. Eğitim ve gözlem ayrı işlemlerde aynı anda
-çalışabilir; atomik dosya değişimi yarım checkpoint okumayı engeller.
+Gözlemevi varsayılan olarak modelleri `training=False` ile açar: replay belleği
+oluşturulmaz. `O` ile canlı öğrenme açıldığında `enable_learning` replay oluşturur;
+ağırlıkları, optimizer'ı veya RNG'yi sıfırlamaz. Her **tam ve otonom** kararın
+başlangıç gözlemi/eylemi ile bitiş gözlemi/ödülü kaydedilir. Karar ortasında öğrenme
+açılması o kısmi geçişi eğitime almaz; elle müdahale o geçişi bütünüyle iptal eder.
+Terminal geçişte `done=True` kaydedilir; yeni dünyada aynı beyinlerle devam edilir.
+
+`F2` bütün bir yapay deney dünyasıdır: çiftleşme bittikten sonra da öğrenme yapılmaz.
+`N` ile normal dünyaya dönmek öğrenmeyi tekrar mümkün kılar. Canlı ağırlıklar ayrı
+`runs/live.npz` dosyasına periyodik, çıkışta ve öğrenme kapatılınca kaydedilir. `L` önce
+canlı ilerlemeyi kaydeder, sonra kaynak modeli yükleyip yeni dünya başlatır. Atomik
+dosya değişimi yarım checkpoint okumayı engeller.
+
+## Hareketli kaynaklar ve ortam geçişi
+
+Kurtçuklar sabit büyüklükte hız vektörleri taşır; her fizik karesinde aynı `tick`
+tarafından ilerletilir. Duvar yansıması taşan mesafeyi korur; köşe ve bir karede
+birden çok duvar geçişi desteklenir. Çarpışma dışında rastgele yön değişimi veya durma yoktur.
+Koku alanı kurtçuğun güncel konumundan hesaplanır.
+
+Ödül şekillendirmesinde önce kurtçuklar ilerler; iki böceğin hareket öncesi ve sonrası
+kokusu **aynı kaynak konumlarına** göre ölçülür. Ardından besin tüketimi çözülür.
+Böylece böceğin durduğu yerde yaklaşan kurtçuktan veya diğer böceğin aynı karede
+besin yemesinden doğan yapay koku ödülleri oluşmaz. Besin paylaşımı mesafeye göre
+çözülür; günlük yemiş olma durumu yalnızca gün sonu açlık cezasını belirler.
+
+Checkpoint biçimi 2, biçim 1'den ağları kayıpsız okuyabilir. Eski varsayılan 6 günlük
+ufuk 30 güne yükseltilir; yeni kaynak/enerji kuralları kullanılır. Eski model seçim
+skoru geçersiz kılınır; yeni doğrulama aynı kurallardaki adayları karşılaştırır.
+Arşiv örnek modelin eski raporu güncellenmiş gibi sunulmaz.
 
 ## Sonraki deneyler
 

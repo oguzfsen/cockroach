@@ -12,7 +12,7 @@ from cockroach.brain import Brain, BrainConfig
 from cockroach.config import WorldConfig
 from cockroach.world import OBS_NAMES, Action
 
-FORMAT_VERSION = 1
+FORMAT_VERSION = 2
 
 
 def save(path: str | Path, brains: list[Brain], config: WorldConfig, training: dict):
@@ -48,18 +48,27 @@ def load(path: str | Path, training: bool = False):
         with np.load(path, allow_pickle=False) as arrays:
             meta = json.loads(str(arrays["metadata"]))
             if (
-                meta["version"] != FORMAT_VERSION
+                meta["version"] not in (1, FORMAT_VERSION)
                 or meta["observations"] != list(OBS_NAMES)
                 or meta["actions"] != [a.name for a in Action]
                 or len(meta["brains"]) != 2
             ):
                 raise ValueError("Model biçimi bu sürümle uyumlu değil.")
-            config = WorldConfig(**meta["world"])
+            world_settings = dict(meta["world"])
+            training_state = dict(meta["training"])
+            if meta["version"] == 1:
+                # Preserve learned parameters and explicit non-default settings;
+                # upgrade the old default horizon and adopt the new arena rules.
+                if world_settings.get("episode_days") == 6:
+                    world_settings["episode_days"] = 30
+                training_state["migrated_from"] = 1
+                training_state["best_validation"] = None
+            config = WorldConfig(**world_settings)
             brains = []
             for i, data in enumerate(meta["brains"]):
                 brain = Brain(i, BrainConfig(**data["config"]), training=training)
                 brain.restore(data, arrays, f"brain{i}")
                 brains.append(brain)
-            return brains, config, meta["training"]
+            return brains, config, training_state
     except (KeyError, TypeError, json.JSONDecodeError) as error:
         raise ValueError(f"Geçersiz model dosyası: {path}") from error

@@ -131,6 +131,11 @@ class Brain:
         if self.replay.size >= max(c.warmup, c.batch_size) and self.steps % c.train_every == 0:
             self.learn()
 
+    def enable_learning(self):
+        """Enable replay without resetting learned weights, Adam, RNG or counters."""
+        if self.replay is None:
+            self.replay = Replay(self.config.replay_size)
+
     def learn(self):
         c = self.config
         states, actions, rewards, next_states, dones = self.replay.sample(c.batch_size, self.rng)

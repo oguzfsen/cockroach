@@ -1,4 +1,4 @@
-"""Read-only Pygame observer. All movement and biology use the headless world."""
+"""Pygame observer with opt-in live learning and shared headless physics."""
 
 from __future__ import annotations
 
@@ -6,11 +6,13 @@ import math
 import random
 import time
 from collections import deque
+from dataclasses import replace
 from pathlib import Path
 
 import numpy as np
 
 from cockroach import checkpoint
+from cockroach.brain import Brain
 from cockroach.config import WorldConfig
 from cockroach.training import random_action
 from cockroach.world import ACTION_NAMES, Action, Insect, World
@@ -36,6 +38,10 @@ def run(
     frames: int | None = None,
     screenshot: Path | None = None,
     headless: bool = False,
+    learning: bool = False,
+    output: Path = Path("runs/live.npz"),
+    natural: bool = False,
+    episode_days: int | None = None,
 ):
     try:
         import pygame
@@ -44,20 +50,56 @@ def run(
     pygame.display.init()
     pygame.font.init()
     try:
-        app = Viewer(pygame, model, seed)
-        app.loop(frames, screenshot, headless)
+        app = Viewer(
+            pygame,
+            model,
+            seed,
+            learning=learning,
+            output=output,
+            natural=natural,
+            episode_days=episode_days,
+        )
+        try:
+            app.loop(frames, screenshot, headless)
+        except KeyboardInterrupt:
+            pass
     finally:
         pygame.quit()
 
 
 class Viewer:
-    def __init__(self, pygame, model: Path | None, seed: int):
+    def __init__(
+        self,
+        pygame,
+        model: Path | None,
+        seed: int,
+        *,
+        learning: bool = False,
+        output: Path = Path("runs/live.npz"),
+        natural: bool = False,
+        episode_days: int | None = None,
+    ):
         self.pg = pygame
         self.model = model
         self.seed = seed
+        self.output = output
+        self.episode_days_override = episode_days
         self.brains, config, self.training = (
-            checkpoint.load(model) if model else (None, WorldConfig(), {})
+            checkpoint.load(model, training=learning) if model else (None, WorldConfig(), {})
         )
+        for key in ("decisions", "episodes"):
+            self.training.setdefault(key, 0)
+        if episode_days is not None:
+            config = replace(config, episode_days=episode_days)
+        self.learning = learning
+        if learning and self.brains is None:
+            self.brains = [Brain(seed * 2 + i) for i in range(2)]
+        self.live_dirty = False
+        self.live_elapsed = 0.0
+        self.learning_started = time.monotonic() if learning else None
+        self.last_save = time.monotonic()
+        self.decision_learning = False
+        self.demo_world = False
         self.world = World(config, seed)
         self.rng = np.random.default_rng(seed + 555)
         self.screen = pygame.display.set_mode(SIZE, pygame.RESIZABLE)
@@ -78,6 +120,7 @@ class Viewer:
         self.show_scent = True
         self.show_circles = False
         self.show_trails = True
+        self.show_annotations = not natural
         self.speeds = [0.5, 1, 2, 4, 8]
         self.speed_index = 1
         self.accumulator = 0.0
@@ -102,10 +145,6 @@ class Viewer:
             pg.draw.circle(
                 surface, (value + 3, value + 2, value - 2), (x, y), rng.choice((1, 1, 2))
             )
-        for x in range(0, 961, 80):
-            pg.draw.line(surface, (40, 44, 37), (x, 0), (x, 640))
-        for y in range(0, 641, 80):
-            pg.draw.line(surface, (40, 44, 37), (0, y), (960, y))
         # Decoration stays outside the physical habitat: no invisible obstacles.
         return surface
 
@@ -133,8 +172,11 @@ class Viewer:
 
     def _choose_actions(self):
         observations = self.world.observations()
+        self.decision_learning = self.learning and not self.manual and not self.demo_world
         actions = [
-            self.brains[i].act(observations[i]) if self.brains else random_action(self.rng)
+            self.brains[i].act(observations[i], explore=self.decision_learning)
+            if self.brains
+            else random_action(self.rng)
             for i in range(2)
         ]
         if self.courtship_demo:
@@ -159,10 +201,55 @@ class Viewer:
                 self.pending_action if self.pending_action is not None else action
             )
             self.pending_action = None
+        self.decision_states = observations
+        self.decision_actions = actions
         self.world.begin_actions(actions)
 
     def toggle(self, name):
         setattr(self, name, not getattr(self, name))
+
+    def toggle_manual(self):
+        self.manual = not self.manual
+        # A transition touched by manual intervention is never replayed.
+        self.decision_learning = False
+
+    def toggle_learning(self):
+        if self.learning:
+            self.live_elapsed += time.monotonic() - self.learning_started
+            self.learning_started = None
+            self.learning = False
+            self.decision_learning = False
+            self.save_live()
+            self._notify("Canlı öğrenme kapalı")
+        else:
+            if self.brains is None:
+                self.brains = [Brain(self.seed * 2 + i) for i in range(2)]
+            else:
+                for brain in self.brains:
+                    brain.enable_learning()
+            self.learning = True
+            self.learning_started = time.monotonic()
+            self._notify(f"Canlı öğrenme açık · kayıt: {self.output}")
+
+    def save_live(self):
+        if not self.live_dirty:
+            return
+        elapsed = self.live_elapsed
+        if self.learning_started is not None:
+            elapsed += time.monotonic() - self.learning_started
+        state = {
+            **self.training,
+            "decisions": self.training.get("decisions", 0),
+            "episodes": self.training.get("episodes", 0),
+            "elapsed_seconds": self.training.get("elapsed_seconds", 0.0) + elapsed,
+            "seed": self.training.get("seed", self.seed),
+            "source": str(self.model) if self.model else None,
+            "mode": "live",
+            "best_validation": None,
+        }
+        checkpoint.save(self.output, self.brains, self.world.config, state)
+        self.live_dirty = False
+        self.last_save = time.monotonic()
 
     def _notify(self, text):
         self.toast = text
@@ -175,6 +262,7 @@ class Viewer:
         self.accumulator = 0
         self.decision_frame = 0
         self.courtship_demo = False
+        self.demo_world = False
         self._choose_actions()
 
     def mating_demo(self):
@@ -185,10 +273,11 @@ class Viewer:
             bug.x = c.width / 2 + (-1 if i == 0 else 1) * (c.radius + 12)
             bug.y = c.height / 2
             bug.angle = math.pi if i == 0 else 0
-            bug.fertile_until = c.day_frames / c.fps
+            bug.fertile_until = c.meal_seconds
             bug.ate_day = 0
         self.manual = False
         self.courtship_demo = True
+        self.demo_world = True
         self._choose_actions()
         self.world.log("Üreme deneyi · beslenmiş çift")
         self._notify("Üreme deneyi: beslenmiş çift, kur eylemi. Öğrenme yapılmaz.")
@@ -198,16 +287,22 @@ class Viewer:
             self._notify("Model yok. Önce terminalde cockroach train çalıştır.")
             return
         try:
-            brains, config, training = checkpoint.load(self.model)
+            self.save_live()
+            brains, config, training = checkpoint.load(self.model, training=self.learning)
         except (ValueError, OSError) as error:
             self._notify(f"Model açılamadı: {error}")
             return
+        if self.episode_days_override is not None:
+            config = replace(config, episode_days=self.episode_days_override)
         self.brains, self.training = brains, training
+        self.live_elapsed = 0.0
+        self.learning_started = time.monotonic() if self.learning else None
         self.world = World(config, self.seed)
         self.trails = [deque(maxlen=240), deque(maxlen=240)]
         self.decision_frame = 0
         self.accumulator = 0
         self.courtship_demo = False
+        self.demo_world = False
         self._choose_actions()
         self._notify("Model yenilendi · yeni gözlem bölümü")
 
@@ -233,7 +328,11 @@ class Viewer:
                 elif key == pg.K_TAB:
                     self.selected = 1 - self.selected
                 elif key == pg.K_m:
-                    self.manual = not self.manual
+                    self.toggle_manual()
+                elif key == pg.K_o:
+                    self.toggle_learning()
+                elif key == pg.K_F1:
+                    self.show_annotations = not self.show_annotations
                 elif key == pg.K_h:
                     self.show_scent = not self.show_scent
                 elif key == pg.K_c:
@@ -294,7 +393,20 @@ class Viewer:
             for trail, bug in zip(self.trails, self.world.insects, strict=False):
                 trail.append(self.point(bug.x, bug.y))
         if self.decision_frame >= self.world.config.decision_frames or self.world.done:
-            self.world.finish_actions()
+            observations, rewards, done = self.world.finish_actions()
+            if self.decision_learning:
+                for i, brain in enumerate(self.brains):
+                    brain.remember(
+                        self.decision_states[i],
+                        self.decision_actions[i],
+                        rewards[i],
+                        observations[i],
+                        done,
+                    )
+                self.training["decisions"] = self.training.get("decisions", 0) + 1
+                if done:
+                    self.training["episodes"] = self.training.get("episodes", 0) + 1
+                self.live_dirty = True
             self.decision_frame = 0
             if not self.world.done:
                 self._choose_actions()
@@ -324,6 +436,30 @@ class Viewer:
             del alpha
             self.scent_surface = pg.transform.smoothscale(layer, ARENA[2:])
         self.canvas.blit(self.scent_surface, ARENA[:2])
+
+    def _draw_food(self, food):
+        """A segmented, wriggling larva; its actual velocity comes from physics."""
+        pg = self.pg
+        heading = math.atan2(food.vy, food.vx)
+        ux, uy = math.cos(heading), math.sin(heading)
+        scale = ARENA[2] / self.world.config.width
+        for segment in range(6):
+            offset = (segment - 2.5) * 3
+            wiggle = math.sin(self.world.now * 9 - segment * 0.85) * 1.4
+            x, y = self.point(
+                food.x + ux * offset - uy * wiggle, food.y + uy * offset + ux * wiggle
+            )
+            radius = (3.4 if 0 < segment < 5 else 2.5) * scale
+            pg.draw.circle(self.canvas, (17, 22, 17), (x, y + 2 * scale), radius + scale)
+            pg.draw.circle(self.canvas, (164, 155, 108), (x, y), radius)
+            pg.draw.circle(
+                self.canvas, (218, 210, 161), (x - 0.6 * scale, y - scale), max(1, radius - scale)
+            )
+        if self.show_annotations:
+            x, y = self.point(food.x, food.y)
+            pulse = 0.5 + math.sin(self.world.now * 3 + food.x) * 0.5
+            pg.draw.circle(self.canvas, (67, 110, 74), (x, y), 15 + pulse * 3, 1)
+            self.text("KURTÇUK", (x + 18, y - 8), 11, GREEN)
 
     def _insect_sprite(self, bug: Insect, index: int):
         pg = self.pg
@@ -421,14 +557,29 @@ class Viewer:
         world = self.world
         self.panel((32, 148, 1000, 680))
         self.canvas.blit(self.texture, ARENA[:2])
-        if self.show_scent:
+        if self.show_annotations:
+            for x in range(0, 961, 80):
+                pg.draw.line(
+                    self.canvas,
+                    (40, 44, 37),
+                    (ARENA[0] + x, ARENA[1]),
+                    (ARENA[0] + x, ARENA[1] + ARENA[3]),
+                )
+            for y in range(0, 641, 80):
+                pg.draw.line(
+                    self.canvas,
+                    (40, 44, 37),
+                    (ARENA[0], ARENA[1] + y),
+                    (ARENA[0] + ARENA[2], ARENA[1] + y),
+                )
+        if self.show_annotations and self.show_scent:
             self._odor()
         self.canvas.set_clip(pg.Rect(ARENA))
         for x, y in world.egg_sites:
             cx, cy = self.point(x, y)
             for k in range(4):
                 pg.draw.ellipse(self.canvas, (157, 133, 85), (cx + k * 4 - 8, cy + k % 2 * 3, 4, 7))
-        if self.show_trails:
+        if self.show_annotations and self.show_trails:
             for i, trail in enumerate(self.trails):
                 points = list(trail)
                 for j in range(1, len(points)):
@@ -437,13 +588,7 @@ class Viewer:
                     muted = tuple(round(30 + (c - 30) * alpha) for c in color)
                     pg.draw.line(self.canvas, muted, points[j - 1], points[j], 2)
         for food in world.food:
-            x, y = self.point(food.x, food.y)
-            pulse = 0.5 + math.sin(world.now * 3 + food.x) * 0.5
-            pg.draw.circle(self.canvas, (49, 89, 67), (x, y), 15 + pulse * 3, 1)
-            pg.draw.circle(self.canvas, (67, 110, 74), (x, y), 11, 1)
-            pg.draw.circle(self.canvas, GREEN, (x, y), 6)
-            pg.draw.circle(self.canvas, (229, 243, 176), (x - 1, y - 2), 2)
-            self.text("BESİN", (x + 16, y - 8), 11, GREEN)
+            self._draw_food(food)
         for i, bug in enumerate(world.insects):
             x, y = self.point(bug.x, bug.y)
             color = GOLD if i == 0 else BLUE
@@ -453,18 +598,18 @@ class Viewer:
                 (19, 22, 19),
                 (x - radius - 2, y - radius + 4, radius * 2 + 4, radius * 2),
             )
-            if self.show_circles:
+            if self.show_annotations and self.show_circles:
                 pg.draw.circle(
                     self.canvas, (219, 117, 98) if bug.collision else color, (x, y), radius, 1
                 )
                 tip = self.point(*world.abdomen_tip(bug))
                 pg.draw.circle(self.canvas, GOLD, tip, 3)
-            if i == self.selected:
+            if self.show_annotations and i == self.selected:
                 for offset in (-math.pi * 0.25, math.pi * 0.75):
                     pg.draw.arc(
                         self.canvas, color, (x - 48, y - 48, 96, 96), offset, offset + 0.7, 2
                     )
-            if bug.action == Action.SNIFF:
+            if self.show_annotations and bug.action == Action.SNIFF:
                 for offset in (-0.65, 0, 0.65):
                     tip = self.point(
                         bug.x + math.cos(bug.angle + offset) * 65,
@@ -474,12 +619,14 @@ class Viewer:
                     pg.draw.circle(self.canvas, TEAL, tip, 3, 1)
             sprite = self._insect_sprite(bug, i)
             self.canvas.blit(sprite, sprite.get_rect(center=(x, y)))
-            self.text(f"{NAMES[i]}  {'♀' if i == 0 else '♂'}", (x - 30, y - 64), 11, color)
+            if self.show_annotations:
+                self.text(f"{NAMES[i]}  {'♀' if i == 0 else '♂'}", (x - 30, y - 64), 11, color)
         self.canvas.set_clip(None)
         pg.draw.rect(self.canvas, (75, 81, 62), ARENA, 1)
-        for value in range(0, 961, 160):
-            self.text(str(value), (ARENA[0] + value - 5, 811), 11, MUTED, mono=True)
-        if self.paused:
+        if self.show_annotations:
+            for value in range(0, 961, 160):
+                self.text(str(value), (ARENA[0] + value - 5, 811), 11, MUTED, mono=True)
+        if self.paused and self.show_annotations:
             self.panel((379, 442, 306, 92))
             self.text("DURAKLATILDI", (425, 459), 22)
             self.text("Devam etmek için SPACE", (434, 496), 12, MUTED)
@@ -507,7 +654,7 @@ class Viewer:
             color if fertility > 0 else MUTED,
         )
         pg.draw.rect(self.canvas, (43, 48, 39), (1080, y + 136, 308, 4), border_radius=2)
-        width = min(1, fertility / self.world.config.day_seconds) * 308
+        width = min(1, fertility / self.world.config.meal_seconds) * 308
         if width > 0:
             pg.draw.rect(self.canvas, color, (1080, y + 136, width, 4), border_radius=2)
         self.text(
@@ -541,7 +688,19 @@ class Viewer:
             not self.paused,
             lambda: self.toggle("paused"),
         )
-        self.pill("ÖĞRENME KAPALI", (1225, 66, 183, 30), color=TEAL)
+        if self.learning and (self.manual or self.demo_world):
+            learning_label = "ÖĞRENME ASKIDA [O]"
+        else:
+            learning_label = "ÖĞRENME AÇIK [O]" if self.learning else "ÖĞRENME KAPALI [O]"
+        self.pill(
+            learning_label, (1195, 66, 213, 30), self.learning, self.toggle_learning, color=TEAL
+        )
+        self.pill(
+            "İşaretler [F1]",
+            (778, 66, 254, 30),
+            self.show_annotations,
+            lambda: self.toggle("show_annotations"),
+        )
         self.text(f"{self.speeds[self.speed_index]:g}×", (1320, 29), 18, GREEN, mono=True)
         self.text("HABİTAT / 01", (32, 113), 12, MUTED, mono=True)
         self.pill(
@@ -567,7 +726,7 @@ class Viewer:
             "ELLE [M]" if self.manual else "OTONOM [M]",
             (870, 107, 162, 30),
             self.manual,
-            lambda: self.toggle("manual"),
+            self.toggle_manual,
         )
         self._draw_arena()
         self.panel((1060, 148, 348, 146))
@@ -612,8 +771,8 @@ class Viewer:
         )
         self.text("SEED " + str(self.seed), (1298, 940), 11, MUTED, mono=True)
         if time.monotonic() < self.toast_until:
-            self.panel((225, 778, 715, 42))
-            self.text(self.toast, (243, 791), 12, GREEN)
+            self.panel((225, 14, 807, 30))
+            self.text(self.toast, (243, 21), 12, GREEN)
         width, height = self.screen.get_size()
         ratio = min(width / SIZE[0], height / SIZE[1])
         target_size = max(1, round(SIZE[0] * ratio)), max(1, round(SIZE[1] * ratio))
@@ -627,18 +786,32 @@ class Viewer:
         pg.display.flip()
 
     def loop(self, frames: int | None, screenshot: Path | None, headless: bool):
+        try:
+            self._loop(frames, screenshot, headless)
+        finally:
+            self.save_live()
+
+    def _loop(self, frames: int | None, screenshot: Path | None, headless: bool):
         clock = self.pg.time.Clock()
         rendered = 0
         running = True
         while running and (frames is None or rendered < frames):
             dt = 1 / 30 if headless else min(clock.tick(30) / 1000, 0.15)
             running = self.handle_events()
+            if not running:
+                break
             if not self.paused:
                 self.accumulator += dt * self.speeds[self.speed_index]
                 while self.accumulator + 1e-10 >= self.world.config.dt:
                     self._tick()
                     self.accumulator -= self.world.config.dt
             self.draw()
+            if self.live_dirty and time.monotonic() - self.last_save >= 15:
+                try:
+                    self.save_live()
+                except OSError as error:
+                    self.last_save = time.monotonic()
+                    self._notify(f"Kayıt yazılamadı: {error}")
             rendered += 1
         if screenshot:
             screenshot.parent.mkdir(parents=True, exist_ok=True)

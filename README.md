@@ -129,7 +129,12 @@ kaynak modelin son kaydını yükler; varsa canlı ilerleme önce ayrı dosyası
   öncelik kareye göre dönüşür. Yenilen her kurtçuk +20 puan verir.
 - Üreme enerjisi tüketimi %20 artmıştır: bir öğün enerjiyi **60 / 1,2 = 50 saniyeye**
   tamamlar. Yeni öğün bu süreyi yeniler; günlük yeme kilidi veya biriken sınırsız rezerv yoktur.
-  Öğünü kaçıran böcek puan kaybeder ama ölmez; öğrenme deneyi devam eder.
+  Öğünü kaçıran böcek yaşam puanı kaybeder.
+- Her böcek **100 yaşam puanıyla** doğar. Hareket sırasında zaman maliyeti dinlenmeye
+  göre **5 katıdır**; yürüme, geri yürüme ve dönme buna dahildir. Puan sıfıra düşünce
+  böcek ölür, bilgi panelinde **RIP** görünür ve gövdesi, bacakları, antenleri sabit kalır.
+  Ölü böcek beslenemez, üreyemez veya tekrar canlanamaz. Dünya 30 günlük bölüm sonuna
+  kadar devam eder; yeni bölümde böcekler yeniden 100 puanla başlar.
 - Koku mesafeyle yumuşak biçimde azalır. Pasif anten algısı 140, koklama eylemi 420
   birime uzanır. Ölçümler karar sonunda güncellenir; koklamak yerinde durmayı gerektirir.
   Antenlerin örnekleme noktaları gövdeden yaklaşık 32 birim ileridedir.
@@ -157,12 +162,14 @@ akvaryumdaki mutlak konum ağa verilmez.** Kokunun ekranda görünmesi algıyı 
 | Gün sonunda kaçırılan öğün | −8 |
 | Tamamlanan çiftleşme | Her böceğe +22 (önceki sürümde +18) |
 | Yürümeyle yerel koku potansiyelindeki değişim | `3 × (yeni − eski)` |
-| Karar süresinin geçmesi | −0,001 |
+| Dinlenilen bir karar süresi | −0,001 |
+| Hareket edilen bir karar süresi | −0,005 (5 kat) |
 | Bir karar boyunca çarpışma | En fazla −0,06 |
 
 Koku değişimi, seyrek besin ödülünü öğrenmeyi kolaylaştıran küçük bir şekillendirme
 ödülüdür. Asıl performans ölçüsü puandan ayrı olarak **yenilen besin oranıdır**.
-Skorlar tüm ödül ve cezaların toplamını gösterir.
+Skor, başlangıçtaki 100 yaşam puanına ödül ve cezaların eklenmiş halidir; alt sınırı
+sıfırdır ve ölümden sonra değişmez. Başlangıç puanı öğrenme ödülü olarak verilmez.
 Hareket eden kurtçuğun duran böceğe yaklaşması tek başına şekillendirme ödülü vermez.
 
 ```bash
@@ -182,7 +189,7 @@ okunur; devam ederken değiştirilemez.
 optimizer aynı kalır; eski varsayılan 6 günlük bölüm 30 güne yükseltilir, yeni enerji,
 üreme ödülü ve hareketli/rekabetçi besin kuralları uygulanır. Açma işlemi eski dosyayı
 değiştirmez. Değişen ortam nedeniyle önceki doğrulama skoru yeni adaylarla karşılaştırılmaz.
-Yeni kayıt biçimi 2'dir. Gözlem ve eylem boyutları değişmemiştir.
+Yeni kayıt biçimi 3'tür; önceki iki biçim de okunabilir. Gözlem ve eylem boyutları değişmemiştir.
 Gözlem süresi ayrıca `./view.sh --episode-days 30` ile seçilebilir.
 
 Son model 15 saniyede bir ve çıkışta atomik olarak kaydedilir. `Ctrl+C` ilerlemeyi

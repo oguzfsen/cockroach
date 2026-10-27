@@ -88,7 +88,9 @@ class Insect:
     y: float
     angle: float
     action: Action = Action.REST
-    score: float = 0.0
+    score: float = 100.0
+    dead: bool = False
+    death_time: float = 0.0
     eaten: int = 0
     missed: int = 0
     ate_day: int = -1
@@ -104,10 +106,10 @@ class Insect:
     previous_scent: float = 0.0
 
     def fertile(self, now: float) -> bool:
-        return self.fertile_until > now
+        return not self.dead and self.fertile_until > now
 
     def mating(self, now: float) -> bool:
-        return self.mating_until > now
+        return not self.dead and self.mating_until > now
 
 
 class World:
@@ -195,6 +197,8 @@ class World:
         return min(total, 1.0)
 
     def _sample(self, b: Insect, active: bool):
+        if b.dead:
+            return
         reach = self.config.sniff_range if active else self.config.passive_range
         samples = []
         for offset in (-0.65, 0.0, 0.65):
@@ -209,8 +213,20 @@ class World:
         b.sample_time = self.now
 
     def _reward(self, i: int, value: float):
-        self.rewards[i] += value
-        self.insects[i].score += value
+        bug = self.insects[i]
+        if bug.dead:
+            return
+        previous = bug.score
+        bug.score = max(0.0, previous + value)
+        self.rewards[i] += bug.score - previous
+        if bug.score == 0:
+            bug.dead = True
+            bug.death_time = self.now
+            bug.action = Action.REST
+            bug.fertile_until = bug.mating_until = self.now
+            bug.scent = [0.0, 0.0, 0.0]
+            bug.scent_change = bug.previous_scent = 0.0
+            self.log(f"{'Dişi' if i == 0 else 'Erkek'} · RIP")
 
     def begin_actions(self, actions):
         if len(actions) != 2:
@@ -218,11 +234,11 @@ class World:
         parsed = [Action(a) for a in actions]
         self.rewards = [0.0, 0.0]
         for b, action in zip(self.insects, parsed, strict=False):
-            b.action = action
+            b.action = Action.REST if b.dead else action
             b.collision = False
 
     def _move(self, b: Insect):
-        if b.mating(self.now):
+        if b.dead or b.mating(self.now):
             return
         c = self.config
         velocity = 0.0
@@ -234,6 +250,8 @@ class World:
             velocity = -c.speed * 0.6
         elif b.action == Action.COURT and b.fertile(self.now):
             mate = self.insects[1] if b is self.insects[0] else self.insects[0]
+            if mate.dead:
+                return
             if math.hypot(mate.x - b.x, mate.y - b.y) < c.radius * 6:
                 # A short-range motor reflex: turn the abdomen toward a sensed mate.
                 target = math.atan2(b.y - mate.y, b.x - mate.x)
@@ -263,6 +281,8 @@ class World:
         overlap = c.radius * 2 - d
 
         def room(bug, vx, vy):
+            if bug.dead:
+                return 0.0
             limits = [overlap]
             if abs(vx) > 1e-9:
                 wall = c.width - c.radius if vx > 0 else c.radius
@@ -290,6 +310,10 @@ class World:
     def _mate(self):
         a, b = self.insects
         now = self.now
+        if a.dead or b.dead:
+            self._mating_active = False
+            a.mating_until = b.mating_until = now
+            return
         if self._mating_active:
             if now >= a.mating_until:
                 self._mating_active = False
@@ -330,20 +354,25 @@ class World:
         # Measure both potentials against the same food positions. A moving worm
         # cannot reward an idle insect merely by approaching it.
         before = [self.scent_at(b.x, b.y) for b in self.insects]
+        moving = []
         for bug in self.insects:
+            previous = (bug.x, bug.y, bug.angle)
             self._move(bug)
+            moving.append(previous != (bug.x, bug.y, bug.angle))
         self._collisions()
         after = [self.scent_at(b.x, b.y) for b in self.insects]
         for i, bug in enumerate(self.insects):
             # Local odor-potential shaping, never a hidden target direction.
             self._reward(i, 3.0 * (after[i] - before[i]))
-            self._reward(i, -0.001 / c.decision_frames)
+            self._reward(i, -(0.005 if moving[i] else 0.001) / c.decision_frames)
             if bug.collision:
                 self._reward(i, -0.06 / c.decision_frames)
         # Food belongs to whoever reaches it first, including an already fed bug.
         # Choose the nearest circle if both touch in one tick; alternate exact ties.
         for food in list(self.food):
-            distances = [math.hypot(b.x - food.x, b.y - food.y) for b in self.insects]
+            distances = [
+                math.inf if b.dead else math.hypot(b.x - food.x, b.y - food.y) for b in self.insects
+            ]
             i = min(range(2), key=lambda j: (distances[j], (j - self.frame) % 2))
             if distances[i] < c.radius + FOOD_RADIUS:
                 bug = self.insects[i]
@@ -357,7 +386,7 @@ class World:
         self.frame += 1
         if self.frame % c.day_frames == 0:
             for i, bug in enumerate(self.insects):
-                if bug.ate_day != self.day:
+                if not bug.dead and bug.ate_day != self.day:
                     bug.missed += 1
                     self._reward(i, -8.0)
                     self.log(f"{'Dişi' if i == 0 else 'Erkek'} öğünü kaçırdı · −8")
@@ -380,7 +409,7 @@ class World:
         now = self.now
         distance = math.hypot(mate.x - b.x, mate.y - b.y)
         bearing = wrap(math.atan2(mate.y - b.y, mate.x - b.x) - b.angle)
-        strength = max(0.0, 1.0 - distance / 180.0)
+        strength = 0.0 if mate.dead else max(0.0, 1.0 - distance / 180.0)
         mate_sensors = [
             strength * max(0.0, math.cos(bearing - offset)) ** 4
             for offset in (-math.pi / 2, 0.0, math.pi / 2, math.pi)

@@ -12,7 +12,7 @@ import numpy as np
 from cockroach import checkpoint
 from cockroach.brain import EXPLORATION, Brain
 from cockroach.config import WorldConfig
-from cockroach.world import World
+from cockroach.world import Action, World
 
 VALIDATION_EVERY = 20_000
 
@@ -135,13 +135,22 @@ def train(
                 ):
                     break
                 actions = [
-                    b.act(obs, explore=True) for b, obs in zip(brains, observations, strict=False)
+                    b.act(observations[i], explore=True)
+                    if not world.insects[i].dead
+                    else Action.REST
+                    for i, b in enumerate(brains)
                 ]
+                alive = [not bug.dead for bug in world.insects]
                 next_observations, rewards, done = world.step(actions)
                 for i, brain in enumerate(brains):
-                    brain.remember(
-                        observations[i], actions[i], rewards[i], next_observations[i], done
-                    )
+                    if alive[i]:
+                        brain.remember(
+                            observations[i],
+                            actions[i],
+                            rewards[i],
+                            next_observations[i],
+                            done or world.insects[i].dead,
+                        )
                 observations = next_observations
                 local_steps += 1
                 decisions += 1
@@ -203,9 +212,13 @@ def rollout(
     observations = world.observations()
     while not world.done:
         actions = [
-            random_action(rng)
-            if brains is None or rng.random() < epsilon
-            else brains[i].act(observations[i])
+            Action.REST
+            if world.insects[i].dead
+            else (
+                random_action(rng)
+                if brains is None or rng.random() < epsilon
+                else brains[i].act(observations[i])
+            )
             for i in range(2)
         ]
         observations, _, _ = world.step(actions)

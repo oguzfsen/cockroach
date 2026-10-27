@@ -137,7 +137,7 @@ def test_two_daily_foods_expire_and_missing_meals_are_penalized_once():
     assert world.food != old
     assert world.food_spawned == 4
     assert all(b.missed == 1 for b in world.insects)
-    assert all(b.score == pytest.approx(-8.002) for b in world.insects)
+    assert all(b.score == pytest.approx(91.998) for b in world.insects)
     while not world.done:
         world.food.clear()
         world.step([Action.REST, Action.REST])
@@ -159,7 +159,7 @@ def test_competitive_bug_can_take_both_daily_foods_and_receives_both_rewards():
     assert not world.food
     assert a.fertile_until == 50
     assert a.fertile(world.now)
-    assert a.score > 39
+    assert a.score > 139
     assert not a.fertile(50)
 
 
@@ -274,7 +274,7 @@ def test_mating_requires_abdomen_contact_then_completes_and_has_cooldown():
     assert world.eggs == 8
     assert all(b.mating_count == 1 for b in world.insects)
     assert all(b.cooldown_until > world.now for b in world.insects)
-    assert all(b.score > 21 for b in world.insects)
+    assert all(b.score > 121 for b in world.insects)
     for _ in range(75):
         world.tick()
     assert world.pairings == 1
@@ -315,7 +315,7 @@ def test_rewards_add_up_to_individual_scores():
     for _ in range(100):
         _, rewards, _ = world.step([Action.WALK, Action.LEFT])
         total += rewards
-    np.testing.assert_allclose(total, [b.score for b in world.insects], rtol=1e-5)
+    np.testing.assert_allclose(total, [b.score - 100 for b in world.insects], rtol=1e-5)
 
 
 @pytest.mark.parametrize(

@@ -52,6 +52,8 @@ ağırlıkları, optimizer'ı veya RNG'yi sıfırlamaz. Her **tam ve otonom** ka
 başlangıç gözlemi/eylemi ile bitiş gözlemi/ödülü kaydedilir. Karar ortasında öğrenme
 açılması o kısmi geçişi eğitime almaz; elle müdahale o geçişi bütünüyle iptal eder.
 Terminal geçişte `done=True` kaydedilir; yeni dünyada aynı beyinlerle devam edilir.
+Bir böceğin yaşam puanı sıfırlanırsa onun son geçişi de terminaldir; öldükten sonra
+replay'e yeni deney eklenmez. Diğer böcek ve dünya bölüm sonuna kadar devam eder.
 
 `F2` bütün bir yapay deney dünyasıdır: çiftleşme bittikten sonra da öğrenme yapılmaz.
 `N` ile normal dünyaya dönmek öğrenmeyi tekrar mümkün kılar. Canlı ağırlıklar ayrı
@@ -72,7 +74,7 @@ Böylece böceğin durduğu yerde yaklaşan kurtçuktan veya diğer böceğin ay
 besin yemesinden doğan yapay koku ödülleri oluşmaz. Besin paylaşımı mesafeye göre
 çözülür; günlük yemiş olma durumu yalnızca gün sonu açlık cezasını belirler.
 
-Checkpoint biçimi 2, biçim 1'den ağları kayıpsız okuyabilir. Eski varsayılan 6 günlük
+Checkpoint biçimi 3, biçim 1 ve 2'den ağları kayıpsız okuyabilir. Eski varsayılan 6 günlük
 ufuk 30 güne yükseltilir; yeni kaynak/enerji kuralları kullanılır. Eski model seçim
 skoru geçersiz kılınır; yeni doğrulama aynı kurallardaki adayları karşılaştırır.
 Arşiv örnek modelin eski raporu güncellenmiş gibi sunulmaz.

@@ -12,7 +12,7 @@ from cockroach.brain import Brain, BrainConfig
 from cockroach.config import WorldConfig
 from cockroach.world import OBS_NAMES, Action
 
-FORMAT_VERSION = 2
+FORMAT_VERSION = 3
 
 
 def save(path: str | Path, brains: list[Brain], config: WorldConfig, training: dict):
@@ -48,7 +48,7 @@ def load(path: str | Path, training: bool = False):
         with np.load(path, allow_pickle=False) as arrays:
             meta = json.loads(str(arrays["metadata"]))
             if (
-                meta["version"] not in (1, FORMAT_VERSION)
+                meta["version"] not in (1, 2, FORMAT_VERSION)
                 or meta["observations"] != list(OBS_NAMES)
                 or meta["actions"] != [a.name for a in Action]
                 or len(meta["brains"]) != 2
@@ -62,6 +62,8 @@ def load(path: str | Path, training: bool = False):
                 if world_settings.get("episode_days") == 6:
                     world_settings["episode_days"] = 30
                 training_state["migrated_from"] = 1
+            if meta["version"] < FORMAT_VERSION:
+                # Scores and survival rules changed; old validation is not comparable.
                 training_state["best_validation"] = None
             config = WorldConfig(**world_settings)
             brains = []

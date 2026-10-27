@@ -174,9 +174,13 @@ class Viewer:
         observations = self.world.observations()
         self.decision_learning = self.learning and not self.manual and not self.demo_world
         actions = [
-            self.brains[i].act(observations[i], explore=self.decision_learning)
-            if self.brains
-            else random_action(self.rng)
+            Action.REST
+            if self.world.insects[i].dead
+            else (
+                self.brains[i].act(observations[i], explore=self.decision_learning)
+                if self.brains
+                else random_action(self.rng)
+            )
             for i in range(2)
         ]
         if self.courtship_demo:
@@ -203,6 +207,7 @@ class Viewer:
             self.pending_action = None
         self.decision_states = observations
         self.decision_actions = actions
+        self.decision_alive = [not bug.dead for bug in self.world.insects]
         self.world.begin_actions(actions)
 
     def toggle(self, name):
@@ -396,13 +401,14 @@ class Viewer:
             observations, rewards, done = self.world.finish_actions()
             if self.decision_learning:
                 for i, brain in enumerate(self.brains):
-                    brain.remember(
-                        self.decision_states[i],
-                        self.decision_actions[i],
-                        rewards[i],
-                        observations[i],
-                        done,
-                    )
+                    if self.decision_alive[i]:
+                        brain.remember(
+                            self.decision_states[i],
+                            self.decision_actions[i],
+                            rewards[i],
+                            observations[i],
+                            done or self.world.insects[i].dead,
+                        )
                 self.training["decisions"] = self.training.get("decisions", 0) + 1
                 if done:
                     self.training["episodes"] = self.training.get("episodes", 0) + 1
@@ -485,10 +491,17 @@ class Viewer:
                 width * scale,
             )
 
-        moving = bug.action in (Action.WALK, Action.BACK, Action.COURT, Action.LEFT, Action.RIGHT)
+        animation_time = bug.death_time if bug.dead else self.world.now
+        moving = not bug.dead and bug.action in (
+            Action.WALK,
+            Action.BACK,
+            Action.COURT,
+            Action.LEFT,
+            Action.RIGHT,
+        )
         phase = bug.distance * 0.3
         if bug.action in (Action.LEFT, Action.RIGHT):
-            phase = self.world.now * 12
+            phase = animation_time * 12
         for side in (-1, 1):
             for leg, anchor in enumerate((-10, 0, 10)):
                 swing = math.sin(phase + (leg % 2 + (side == 1)) * math.pi) if moving else 0
@@ -521,7 +534,7 @@ class Viewer:
         for side in (-1, 1):
             ellipse((16, side * 6 - 2, 4, 4), (196, 202, 161))
             sniffing = bug.action == Action.SNIFF
-            sway = math.sin(self.world.now * (9 if sniffing else 3) + side) * (8 if sniffing else 3)
+            sway = math.sin(animation_time * (9 if sniffing else 3) + side) * (8 if sniffing else 3)
             points = [
                 (22, side * 5),
                 (31, side * 11),
@@ -641,14 +654,18 @@ class Viewer:
         self.text("DİŞİ / ♀" if index == 0 else "ERKEK / ♂", (1287, y + 22), 12, MUTED)
         if index == self.selected:
             self.text("ELLE KONTROL" if self.manual else "SEÇİLİ", (1080, y + 50), 11, color)
-        mode = "Çiftleşiyor" if bug.mating(self.world.now) else ACTION_NAMES[bug.action]
+        mode = (
+            "RIP"
+            if bug.dead
+            else ("Çiftleşiyor" if bug.mating(self.world.now) else ACTION_NAMES[bug.action])
+        )
         self.text(mode, (1080, y + 73), 18)
         self.text(f"{bug.score:+.1f}", (1285, y + 70), 18, color, mono=True)
-        self.text("SKOR", (1340, y + 97), 11, MUTED)
+        self.text("YAŞAM", (1340, y + 97), 11, MUTED)
         fertility = max(0, bug.fertile_until - self.world.now)
         self.text("ÜREME ENERJİSİ", (1080, y + 112), 11, MUTED)
         self.text(
-            f"{fertility:.0f} s" if fertility > 0 else "Besin aranıyor",
+            "RIP" if bug.dead else f"{fertility:.0f} s" if fertility > 0 else "Besin aranıyor",
             (1270, y + 112),
             11,
             color if fertility > 0 else MUTED,

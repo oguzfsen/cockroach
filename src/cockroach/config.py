@@ -1,6 +1,7 @@
 from dataclasses import dataclass
 
 
+
 @dataclass(frozen=True)
 class WorldConfig:
     width: float = 960.0

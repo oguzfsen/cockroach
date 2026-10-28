@@ -364,9 +364,9 @@ class World:
         for i, bug in enumerate(self.insects):
             # Local odor-potential shaping, never a hidden target direction.
             self._reward(i, 3.0 * (after[i] - before[i]))
-            self._reward(i, -(0.005 if moving[i] else 0.001) / c.decision_frames)
+            self._reward(i, -(0.02 if moving[i] else 0.015) / c.decision_frames)
             if bug.collision:
-                self._reward(i, -0.06 / c.decision_frames)
+                self._reward(i, -0.6 / c.decision_frames)
         # Food belongs to whoever reaches it first, including an already fed bug.
         # Choose the nearest circle if both touch in one tick; alternate exact ties.
         for food in list(self.food):
@@ -380,7 +380,7 @@ class World:
                 bug.eaten += 1
                 bug.ate_day = self.day
                 bug.fertile_until = self.now + c.meal_seconds
-                self._reward(i, 20.0)
+                self._reward(i, 30.0)
                 self.log(f"{'Dişi' if i == 0 else 'Erkek'} beslendi · +20")
         self._mate()
         self.frame += 1

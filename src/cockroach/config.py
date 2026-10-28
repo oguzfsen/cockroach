@@ -12,13 +12,13 @@ class WorldConfig:
     radius: float = 18.0
     speed: float = 90.0
     turn_speed: float = 2.5
-    scent_scale: float = 180.0
-    sniff_range: float = 420.0
+    scent_scale: float = 80.0
+    sniff_range: float = 220.0
     passive_range: float = 140.0
     mating_seconds: float = 2.4
     mating_cooldown: float = 15.0
     fertility_energy_factor: float = 1.2
-    mating_reward: float = 22.0
+    mating_reward: float = 100.0
     food_speed_ratio: float = 0.5
 
     def __post_init__(self):

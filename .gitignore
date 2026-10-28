@@ -6,7 +6,26 @@ __pycache__/
 .ruff_cache/
 build/
 dist/
-runs/
+runs*/
 *.npz
 !examples/forager.npz
 .DS_Store
+Thumbs.db
+
+# Local editor settings, indexes and temporary files
+.vscode/
+.idea/
+.vs/
+*.code-workspace
+*.swp
+*.swo
+*~
+
+# Additional Python tooling caches
+.mypy_cache/
+.pytype/
+.tox/
+.nox/
+.coverage
+.coverage.*
+htmlcov/
